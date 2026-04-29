@@ -29,6 +29,11 @@ Thumbs.db
 *.cache.json
 fixtures/private/
 
+# Coverage
+.coverage
+coverage.xml
+htmlcov/
+
 # Local secrets
 .env
 .env.local

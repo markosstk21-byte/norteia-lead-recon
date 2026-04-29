@@ -4,6 +4,35 @@ Todos los cambios notables a `norteia-lead-recon` se documentan aquí.
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y el versionado sigue [SemVer](https://semver.org/lang/es/).
 
+## [Unreleased] — v0.1.1 — Honestidad y diagnóstico
+
+> Cambios in-flight tras la auditoría post-publicación pública (2026-04-29).
+> Foco: cerrar el gap entre lo que la skill **promete** y lo que **realmente
+> hace** en código. Sin nuevas features, solo robustez y transparencia.
+
+### Added
+
+- `SourceStatus` tipado con vocabulario estricto (`ok`, `empty_window`,
+  `network_error`, `http_error`, `parse_error`, `not_executed`, `down`).
+  Una fuente NUNCA falla silenciosa: cada `0` lleva motivo legible.
+- Panel de diagnóstico en `discover.html.jinja` cuando `totalCandidates == 0`:
+  desglose por fuente del por qué no aportó resultados.
+- 6 tests nuevos (24/24 GREEN): typed status, exception → `down`, E2E del
+  diagnóstico per-source.
+
+### Fixed
+
+- `discover.py`: el `except Exception` silencioso ya no oculta el motivo real
+  por el que una fuente devuelve 0. Causa raíz documentada del bug
+  `leadReconStats.lastTotal:0` observado en el primer run real.
+- `borme.analyze_by_nif`: status legacy `"ok-no-index"` reemplazado por
+  `"not_executed"` con razón explícita (BORME no expone índice por NIF).
+
+### Removed
+
+- Línea engañosa del CHANGELOG v0.1.0 que afirmaba que el anti-claim guard
+  estaba implementado. Movida a "Known caveats" — pendiente para issue #5.
+
 ## [0.1.0] — 2026-04-29
 
 ### Added
@@ -14,18 +43,28 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) y el v
 - `mappings/cnae.json` con 20 sectores legibles → CNAE-2009 + 52 provincias INE.
 - 2 plantillas HTML twin: `discover.html.jinja` (mapa Leaflet OSM + tabla) y `analyze.html.jinja` (timeline registral + ficha).
 - 3 slash-commands: `/lead-discover`, `/lead-analyze`, `/lead-cross`.
-- Anti-claim guard: emite `assertion_mismatch` cuando una afirmación del operador no se valida contra Mission Control.
 - Cache TTL escalonado por capa (BORME indefinida, Cartociudad 90d, DDG 7d, OSM 7d).
 - 18 tests unit GREEN.
 - Auto-detección de runners hermanos del proyecto Mapeador (autodetect `apps/borme-parser/dist/` y `apps/worker-py/`).
 - Configurable via env vars: `LEAD_RECON_PROJECT_ROOT`, `MISSION_CONTROL_API_URL`, `MISSION_CONTROL_API_KEY`, `MISSION_CONTROL_LEADS_PATH`, `BORME_PARSER_URL`, `WORKER_PY_URL`.
 
-### Known limitations
+### Known caveats — sé honesto antes de mergear
 
-- BORME: solo procesa **sumarios** (títulos de actos), no extrae **capital social** del XML del acto individual. Esto es trabajo de v0.2.
-- DIRCE: solo segment sizing — NO devuelve listado nominal (DIRCE es agregado estadístico por construcción; documentado).
-- Registradores.org: modo `--premium` reservado, integración real pendiente (€10-30/empresa, requiere flow de pago + scraping autenticado).
-- Discovery por sumario BORME tiene baja recall por geografía: títulos no siempre incluyen provincia. Mitigación v0.2: parser de actos individuales con filtro fiable.
+Documentamos aquí lo que **NO** funciona en v0.1.0 — leer antes de basar
+decisiones de negocio en outputs de esta versión.
+
+| Componente | Estado real v0.1.0 | Issue / fix |
+|---|---|---|
+| `borme.discover_by_cnae_province` | Parcial — sólo sumarios, no XML de acto | [#1](https://github.com/Luispitik/norteia-lead-recon/issues/1) |
+| `borme.analyze_by_nif` | **Stub** — devuelve timeline vacío con nota | Delegar a `apps/borme-parser` o `--premium` |
+| `dirce.segment_size` | **Stub** — `totalCompanies: null` | [#2](https://github.com/Luispitik/norteia-lead-recon/issues/2) |
+| `--premium` con Registradores.org | **No implementado** — sólo imprime WARN | [#3](https://github.com/Luispitik/norteia-lead-recon/issues/3) |
+| Anti-claim guard `/lead-cross` | **Documentado pero no en código** | issue v0.1.1 (P0 audit) |
+| `osm.PROVINCE_BBOX` | **Sólo 7/52 provincias mapeadas** | issue v0.1.1 |
+| Fallback real a `apps/borme-parser` | `detect_project_runners()` existe pero ningún orquestador lo invoca | issue v0.1.1 |
+| Evidence pack (`url + fetchedAt + sha256`) | Sólo `url`, falta timestamp y hash | issue v0.1.1 |
+| Confirmación humana en `--premium` | No bloquea — sólo imprime WARN | fix v0.1.1 (P0 audit) |
+| Discovery por sumario BORME | Baja recall por geografía (filtra por keyword en título) | [#1](https://github.com/Luispitik/norteia-lead-recon/issues/1) |
 
 ### Sources verificadas (uptime esperado)
 
