@@ -175,6 +175,79 @@ class TestSourceStatus(unittest.TestCase):
         self.assertEqual(_common.SourceStatus.snapshot()["X"]["count"], 1)
 
 
+class TestAntiClaimGuard(unittest.TestCase):
+    """v0.1.1: cross.py --assert blocks downstream when a claim is unsupported."""
+
+    def test_evaluate_assertion_supported(self):
+        import cross as cross_mod
+        sources = {
+            "missionControl": [{"id": "L-42", "razonSocial": "Asesores Pérez", "stage": "cliente"}],
+            "leadResearchBrief": [],
+            "observations": [],
+        }
+        r = cross_mod.evaluate_assertion("cliente", sources)
+        self.assertTrue(r["supported"])
+        self.assertEqual(r["closestSource"], "missionControl")
+        self.assertGreaterEqual(r["hits"], 1)
+
+    def test_evaluate_assertion_unsupported(self):
+        import cross as cross_mod
+        sources = {"missionControl": [{"id": "L-42", "stage": "lead"}], "observations": []}
+        r = cross_mod.evaluate_assertion("facturacion 5M", sources)
+        self.assertFalse(r["supported"])
+        self.assertIsNone(r["closestSource"])
+        self.assertEqual(r["hits"], 0)
+
+    def test_evaluate_assertion_empty_string_is_vacuously_supported(self):
+        import cross as cross_mod
+        r = cross_mod.evaluate_assertion("", {"missionControl": []})
+        self.assertTrue(r["supported"])
+
+    def test_cross_with_unsupported_assertion_sets_mismatch(self):
+        import cross as cross_mod
+        # Force all sources to be empty to guarantee the assertion has no hit
+        orig_mc = cross_mod.search_mission_control
+        orig_lrb = cross_mod.search_brief_outputs
+        orig_obs = cross_mod.search_observations
+        orig_inst = cross_mod.search_instincts
+        cross_mod.search_mission_control = lambda *a, **kw: []
+        cross_mod.search_brief_outputs = lambda *a, **kw: []
+        cross_mod.search_observations = lambda *a, **kw: []
+        cross_mod.search_instincts = lambda *a, **kw: []
+        try:
+            payload = cross_mod.cross("B12345678", assertions=["totalmente-fake-claim-xyz"])
+            self.assertTrue(payload["assertionMismatch"])
+            self.assertEqual(len(payload["assertions"]), 1)
+            self.assertFalse(payload["assertions"][0]["supported"])
+            # Warning is emitted
+            self.assertTrue(any("assertion_mismatch" in w for w in payload["warnings"]))
+        finally:
+            cross_mod.search_mission_control = orig_mc
+            cross_mod.search_brief_outputs = orig_lrb
+            cross_mod.search_observations = orig_obs
+            cross_mod.search_instincts = orig_inst
+
+    def test_cross_without_assertions_never_sets_mismatch(self):
+        import cross as cross_mod
+        orig_mc = cross_mod.search_mission_control
+        orig_lrb = cross_mod.search_brief_outputs
+        orig_obs = cross_mod.search_observations
+        orig_inst = cross_mod.search_instincts
+        cross_mod.search_mission_control = lambda *a, **kw: []
+        cross_mod.search_brief_outputs = lambda *a, **kw: []
+        cross_mod.search_observations = lambda *a, **kw: []
+        cross_mod.search_instincts = lambda *a, **kw: []
+        try:
+            payload = cross_mod.cross("B12345678")
+            self.assertFalse(payload["assertionMismatch"])
+            self.assertEqual(payload["assertions"], [])
+        finally:
+            cross_mod.search_mission_control = orig_mc
+            cross_mod.search_brief_outputs = orig_lrb
+            cross_mod.search_observations = orig_obs
+            cross_mod.search_instincts = orig_inst
+
+
 class TestPremiumConfirmation(unittest.TestCase):
     """v0.1.1: --premium must block on stdin unless --yes / env override is set.
 

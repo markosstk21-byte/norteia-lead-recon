@@ -154,10 +154,50 @@ def search_instincts(needle: str) -> list[dict]:
     return matches[:20]
 
 
-def cross(input_str: str) -> dict:
+def evaluate_assertion(claim: str, sources: dict[str, list]) -> dict:
+    """Anti-claim guard primitive: is `claim` supported by any local source?
+
+    `claim` is a free-text string. Match is case-insensitive substring on the
+    JSON-serialized blob of every result in every source. Crude on purpose:
+    v0.1.1 ships the contract (mismatch flag + write-block + exit code), the
+    semantic matcher is left to v0.2 once Mission Control's schema is stable.
+
+    Returns:
+        {
+            "claim": str,
+            "supported": bool,
+            "closestSource": str | None,  # which source had the strongest hit
+            "hits": int,
+        }
+    """
+    needle = (claim or "").strip().lower()
+    if not needle:
+        return {"claim": claim, "supported": True, "closestSource": None, "hits": 0}
+    best_source = None
+    total = 0
+    for src_name, items in sources.items():
+        for it in items or []:
+            try:
+                blob = json.dumps(it, ensure_ascii=False).lower()
+            except (TypeError, ValueError):
+                continue
+            if needle in blob:
+                total += 1
+                if best_source is None:
+                    best_source = src_name
+    return {
+        "claim": claim,
+        "supported": total > 0,
+        "closestSource": best_source,
+        "hits": total,
+    }
+
+
+def cross(input_str: str, assertions: list[str] | None = None) -> dict:
     needle = input_str.strip()
     nif_form = normalize_nif(needle) if is_valid_nif(needle) else None
     name_form = normalize_razon_social(needle)
+    assertions = list(assertions or [])
 
     # Search with both forms — wider net
     queries = [q for q in [needle, nif_form, name_form] if q]
@@ -230,7 +270,39 @@ def cross(input_str: str) -> dict:
         "missing": missing,
         "nextRecommendedSkill": next_skill,
         "warnings": [],
+        "assertions": [],
+        "assertionMismatch": False,
     }
+
+    # --- Anti-claim guard ---------------------------------------------------
+    # If the operator passes --assert "<claim>" arguments, each one is checked
+    # against ALL available local sources. Any unsupported claim sets
+    # assertionMismatch=true, emits a typed observation, and forces a non-zero
+    # exit at the CLI. NEVER write to Mission Control if a mismatch exists.
+    if assertions:
+        check_sources = {
+            "missionControl": mc_results,
+            "leadResearchBrief": lrb_results,
+            "meetingPreauditBrief": mpb_results,
+            "observations": obs_results,
+            "instincts": inst_results,
+        }
+        for claim in assertions:
+            result = evaluate_assertion(claim, check_sources)
+            payload["assertions"].append(result)
+            if not result["supported"]:
+                payload["assertionMismatch"] = True
+                payload["warnings"].append(
+                    f"assertion_mismatch: '{claim}' no está respaldado por ninguna "
+                    f"fuente local (Mission Control, briefs, observations, instincts)."
+                )
+                emit_observation("assertion_mismatch", {
+                    "phase": "cross.assertion",
+                    "input": needle,
+                    "claim": claim,
+                    "closestSource": result["closestSource"],
+                    "hits": result["hits"],
+                })
 
     snapshot_path = write_snapshot("cross", payload)
     payload["writes"] = {"snapshot": str(snapshot_path)}
@@ -241,6 +313,7 @@ def cross(input_str: str) -> dict:
         "missionControlHits": len(mc_results),
         "briefHits": len(lrb_results) + len(mpb_results),
         "next": next_skill,
+        "assertionMismatch": payload["assertionMismatch"],
     })
     return payload
 
@@ -248,8 +321,20 @@ def cross(input_str: str) -> dict:
 def main() -> None:
     p = argparse.ArgumentParser(description="norteia-lead-recon — cross orchestrator")
     p.add_argument("--input", required=True)
+    p.add_argument(
+        "--assert",
+        action="append",
+        dest="assertions",
+        default=[],
+        metavar="CLAIM",
+        help=(
+            "Assert a claim about the lead (e.g. --assert \"es cliente\" "
+            "--assert \"facturacion 5M\"). Each unsupported claim sets "
+            "assertionMismatch=true and forces exit code 2."
+        ),
+    )
     args = p.parse_args()
-    payload = cross(args.input)
+    payload = cross(args.input, assertions=args.assertions)
     print(json.dumps({
         "input": payload["input"],
         "summary": {
@@ -261,8 +346,17 @@ def main() -> None:
         },
         "missing": payload["missing"],
         "nextRecommendedSkill": payload["nextRecommendedSkill"],
+        "assertions": payload["assertions"],
+        "assertionMismatch": payload["assertionMismatch"],
+        "warnings": payload["warnings"],
         "writes": payload["writes"],
     }, ensure_ascii=False, indent=2))
+
+    if payload["assertionMismatch"]:
+        # Non-zero exit so CI/automation can react. The local snapshot is still
+        # written so the operator can review which claims failed; what's blocked
+        # is downstream automation (Mission Control writes, etc.).
+        sys.exit(2)
 
 
 if __name__ == "__main__":
