@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual envs
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Skill runtime data (NEVER commit)
+.cache/
+*.cache.json
+fixtures/private/
+
+# Local secrets
+.env
+.env.local
+.env.*.local
+
+# Outputs (generated per-run)
+~/.claude/.cache/lead-recon/
+*.snapshot.json
+discover-*.html
+analyze-*.html
+cross-*.html
+discover-*.json
+analyze-*.json
+cross-*.json

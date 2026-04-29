@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: #0b0d10; color: #e8eaed; }
+  header { padding: 20px 24px; background: #11141a; border-bottom: 1px solid #1d2129; }
+  h1 { margin: 0 0 4px; font-size: 18px; font-weight: 600; }
+  .meta { color: #8b94a3; font-size: 12px; }
+  .layout { display: grid; grid-template-columns: 1.4fr 1fr; min-height: calc(100vh - 73px); }
+  #map { height: 100%; min-height: 600px; background: #1d2129; }
+  .panel { padding: 16px 20px; overflow-y: auto; max-height: calc(100vh - 73px); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+  .stat { background: #11141a; padding: 12px; border-radius: 8px; border: 1px solid #1d2129; }
+  .stat .n { font-size: 22px; font-weight: 700; color: #e8eaed; }
+  .stat .l { font-size: 11px; color: #8b94a3; text-transform: uppercase; letter-spacing: 0.5px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #1d2129; vertical-align: top; }
+  th { color: #8b94a3; font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  td.rs { font-weight: 500; }
+  td.domain a { color: #6aa9ff; text-decoration: none; }
+  td.domain a:hover { text-decoration: underline; }
+  .badge { display: inline-block; padding: 2px 6px; border-radius: 10px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+  .badge.ok { background: #1f3a2a; color: #6cd083; }
+  .badge.warn { background: #3a2f1f; color: #d0a06c; }
+  .badge.err { background: #3a1f1f; color: #d06c6c; }
+  .source-pill { display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 10px; background: #1d2129; color: #8b94a3; margin-right: 4px; }
+  .footer { padding: 16px 24px; color: #6c7383; font-size: 11px; border-top: 1px solid #1d2129; }
+</style>
+</head>
+<body>
+<header>
+  <h1>{{TITLE}}</h1>
+  <div class="meta" id="meta"></div>
+</header>
+<div class="layout">
+  <div id="map"></div>
+  <div class="panel">
+    <div class="stats" id="stats"></div>
+    <table>
+      <thead>
+        <tr><th>Razón social</th><th>NIF</th><th>Dominio</th><th>Fuentes</th></tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <h3 style="margin-top:24px;font-size:14px;color:#8b94a3;">Disponibilidad fuentes</h3>
+    <div id="sources"></div>
+  </div>
+</div>
+<div class="footer">
+  Generado por <code>norteia-lead-recon</code>. Todos los datos provienen de fuentes oficiales abiertas.
+  Respeta GDPR + LSSI-CE Art. 21 antes de cualquier outreach.
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+const PAYLOAD = {{PAYLOAD_JSON}};
+
+const meta = document.getElementById('meta');
+meta.textContent = `${PAYLOAD.totalCandidates} candidatos · ${PAYLOAD.totalUnresolvedDomain} sin dominio resuelto · generado ${PAYLOAD.timestamp}`;
+
+const stats = document.getElementById('stats');
+stats.innerHTML = `
+  <div class="stat"><div class="n">${PAYLOAD.totalCandidates}</div><div class="l">Candidatos</div></div>
+  <div class="stat"><div class="n">${PAYLOAD.totalCandidates - PAYLOAD.totalUnresolvedDomain}</div><div class="l">Con dominio</div></div>
+  <div class="stat"><div class="n">${(PAYLOAD.segmentSize && PAYLOAD.segmentSize.totalCompanies) || '—'}</div><div class="l">DIRCE segmento</div></div>
+`;
+
+const tbody = document.getElementById('tbody');
+PAYLOAD.candidates.forEach(c => {
+  const tr = document.createElement('tr');
+  const domain = c.domain && c.domain.resolved
+    ? `<a href="https://${c.domain.resolved}" target="_blank" rel="noopener">${c.domain.resolved}</a>`
+    : `<span class="badge warn">sin dominio</span>`;
+  const sources = (c.sourcesHit || []).map(s => `<span class="source-pill">${s}</span>`).join('');
+  tr.innerHTML = `
+    <td class="rs">${escapeHtml(c.razonSocial || '')}</td>
+    <td>${c.nif || '—'}</td>
+    <td class="domain">${domain}</td>
+    <td>${sources}</td>
+  `;
+  tbody.appendChild(tr);
+});
+
+const sourcesEl = document.getElementById('sources');
+Object.entries(PAYLOAD.sourcesAvailability || {}).forEach(([src, status]) => {
+  const cls = status === 'ok' ? 'ok' : status.startsWith('http-') || status === 'down' ? 'err' : 'warn';
+  const el = document.createElement('span');
+  el.className = `badge ${cls}`;
+  el.textContent = `${src}: ${status}`;
+  el.style.marginRight = '6px';
+  sourcesEl.appendChild(el);
+});
+
+// Map
+const center = (() => {
+  const geos = PAYLOAD.candidates.map(c => c.geocoded).filter(g => g && g.lat && g.lon);
+  if (!geos.length) return [40.4168, -3.7038]; // Madrid fallback
+  const avgLat = geos.reduce((a, g) => a + g.lat, 0) / geos.length;
+  const avgLon = geos.reduce((a, g) => a + g.lon, 0) / geos.length;
+  return [avgLat, avgLon];
+})();
+const map = L.map('map').setView(center, 9);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+}).addTo(map);
+
+PAYLOAD.candidates.forEach(c => {
+  if (!c.geocoded || !c.geocoded.lat || !c.geocoded.lon) return;
+  const m = L.marker([c.geocoded.lat, c.geocoded.lon]).addTo(map);
+  const dom = c.domain && c.domain.resolved ? `<br><a href="https://${c.domain.resolved}" target="_blank">${c.domain.resolved}</a>` : '';
+  m.bindPopup(`<b>${escapeHtml(c.razonSocial || '')}</b>${dom}<br>${escapeHtml(c.registralAddress || '')}`);
+});
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+</script>
+</body>
+</html>

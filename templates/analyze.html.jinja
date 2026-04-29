@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: #0b0d10; color: #e8eaed; line-height: 1.5; }
+  header { padding: 24px; background: #11141a; border-bottom: 1px solid #1d2129; }
+  h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; }
+  .meta { color: #8b94a3; font-size: 12px; }
+  .container { max-width: 980px; margin: 0 auto; padding: 24px; }
+  .card { background: #11141a; padding: 16px 20px; border-radius: 10px; border: 1px solid #1d2129; margin-bottom: 16px; }
+  h2 { font-size: 14px; color: #8b94a3; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; margin: 0 0 12px; }
+  h3 { margin: 16px 0 8px; font-size: 15px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
+  .grid-2 dt { color: #8b94a3; font-size: 12px; }
+  .grid-2 dd { margin: 0 0 8px; font-size: 13px; }
+  .timeline { position: relative; padding-left: 24px; border-left: 2px solid #1d2129; }
+  .event { position: relative; margin-bottom: 16px; padding: 8px 12px; background: #11141a; border-radius: 6px; border: 1px solid #1d2129; }
+  .event::before { content: ''; position: absolute; left: -29px; top: 14px; width: 8px; height: 8px; border-radius: 50%; background: #6aa9ff; }
+  .event .date { font-size: 11px; color: #8b94a3; }
+  .event .type { font-weight: 600; font-size: 13px; margin-top: 2px; }
+  .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+  .badge.ok { background: #1f3a2a; color: #6cd083; }
+  .badge.warn { background: #3a2f1f; color: #d0a06c; }
+  .badge.err { background: #3a1f1f; color: #d06c6c; }
+  .recommendation { background: #1f2d3a; border: 1px solid #2a4358; padding: 14px 18px; border-radius: 10px; }
+  .recommendation .label { color: #8b94a3; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .recommendation .reason { font-size: 14px; }
+  ul.warnings { background: #2d1f1f; border: 1px solid #4a2a2a; padding: 12px 16px 12px 32px; border-radius: 8px; color: #d6a8a8; font-size: 13px; }
+  pre { background: #11141a; padding: 12px; border-radius: 6px; border: 1px solid #1d2129; font-size: 12px; overflow-x: auto; max-height: 300px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="container">
+    <h1>{{TITLE}}</h1>
+    <div class="meta" id="meta"></div>
+  </div>
+</header>
+<main class="container">
+  <div id="warnings"></div>
+
+  <div class="card">
+    <h2>Identificación</h2>
+    <dl class="grid-2" id="ident"></dl>
+  </div>
+
+  <div class="card">
+    <h2>Recomendación NorteIA</h2>
+    <div class="recommendation" id="reco"></div>
+  </div>
+
+  <div class="card">
+    <h2>Cumplimiento (AEPD-DPO)</h2>
+    <div id="compliance"></div>
+  </div>
+
+  <div class="card">
+    <h2>Sector público</h2>
+    <h3>Contratos públicos (PLACSP)</h3>
+    <div id="contracts"></div>
+    <h3>Subvenciones (Infosubvenciones)</h3>
+    <div id="subsidies"></div>
+  </div>
+
+  <div class="card">
+    <h2>Web del lead</h2>
+    <div id="web"></div>
+  </div>
+
+  <div class="card">
+    <h2>Timeline registral (BORME)</h2>
+    <div class="timeline" id="timeline"></div>
+  </div>
+
+  <div class="card">
+    <h2>Disponibilidad fuentes</h2>
+    <div id="sources"></div>
+  </div>
+
+  <div class="card">
+    <h2>Datos premium (Registradores.org)</h2>
+    <div id="premium"></div>
+  </div>
+
+  <details class="card">
+    <summary style="cursor:pointer;color:#8b94a3;">Payload JSON completo</summary>
+    <pre id="raw"></pre>
+  </details>
+</main>
+<script>
+const PAYLOAD = {{PAYLOAD_JSON}};
+
+const meta = document.getElementById('meta');
+meta.textContent = `Generado ${PAYLOAD.timestamp} · modo ${PAYLOAD.mode} · premium ${PAYLOAD.premium ? 'sí' : 'no'}`;
+
+const ident = document.getElementById('ident');
+ident.innerHTML = `
+  <dt>Razón social</dt><dd>${PAYLOAD.input.razon_social || '—'}</dd>
+  <dt>NIF</dt><dd>${PAYLOAD.input.nif || '—'}</dd>
+`;
+
+const reco = document.getElementById('reco');
+const qualified = (PAYLOAD.recommendation && PAYLOAD.recommendation.qualifiedFor) || [];
+reco.innerHTML = `
+  <div class="label">Productos NorteIA recomendados</div>
+  <div>${qualified.length ? qualified.map(p => `<span class="badge ok" style="margin-right:4px">${p}</span>`).join('') : '<span class="badge warn">datos insuficientes</span>'}</div>
+  <div class="reason" style="margin-top:8px">${(PAYLOAD.recommendation && PAYLOAD.recommendation.reason) || ''}</div>
+`;
+
+const compEl = document.getElementById('compliance');
+const dpo = (PAYLOAD.compliance && PAYLOAD.compliance.dpoRegistered);
+compEl.innerHTML = dpo
+  ? `<span class="badge ok">DPO registrado</span> <span style="color:#8b94a3">— señal de madurez compliance</span>`
+  : `<span class="badge warn">Sin DPO detectado en AEPD</span>`;
+
+const contracts = document.getElementById('contracts');
+const c = PAYLOAD.publicSector.contracts || [];
+contracts.innerHTML = c.length
+  ? '<ul>' + c.map(x => `<li>${escapeHtml(x.title || JSON.stringify(x))}</li>`).join('') + '</ul>'
+  : '<span style="color:#8b94a3">Sin contratos detectados</span>';
+
+const subs = document.getElementById('subsidies');
+const s = PAYLOAD.publicSector.subsidies || [];
+subs.innerHTML = s.length
+  ? '<ul>' + s.map(x => `<li>${escapeHtml(JSON.stringify(x.raw || x))}</li>`).join('') + '</ul>'
+  : '<span style="color:#8b94a3">Sin subvenciones detectadas</span>';
+
+const web = document.getElementById('web');
+if (PAYLOAD.web && PAYLOAD.web.domain) {
+  web.innerHTML = `<a href="https://${PAYLOAD.web.domain}" target="_blank" style="color:#6aa9ff">${PAYLOAD.web.domain}</a> <span class="badge ok">${PAYLOAD.web.confidence || ''}</span> via <code>${PAYLOAD.web.resolved_via}</code>`;
+} else if (PAYLOAD.web) {
+  web.innerHTML = `<span class="badge warn">Dominio no resuelto</span>`;
+} else {
+  web.innerHTML = '<span style="color:#8b94a3">—</span>';
+}
+
+const timeline = document.getElementById('timeline');
+(PAYLOAD.registralTimeline || []).forEach(e => {
+  const div = document.createElement('div');
+  div.className = 'event';
+  div.innerHTML = `<div class="date">${e.date || ''}</div><div class="type">${escapeHtml(e.type || '')}</div>`;
+  timeline.appendChild(div);
+});
+if (!PAYLOAD.registralTimeline || !PAYLOAD.registralTimeline.length) {
+  timeline.innerHTML = '<span style="color:#8b94a3">Sin eventos en BORME (o NIF no indexado en MVP — delegar a apps/borme-parser).</span>';
+}
+
+const sourcesEl = document.getElementById('sources');
+Object.entries(PAYLOAD.sourcesAvailability || {}).forEach(([src, status]) => {
+  const cls = status === 'ok' ? 'ok' : status.startsWith('http-') || status === 'down' ? 'err' : 'warn';
+  const el = document.createElement('span');
+  el.className = `badge ${cls}`;
+  el.textContent = `${src}: ${status}`;
+  el.style.marginRight = '6px';
+  sourcesEl.appendChild(el);
+});
+
+const premium = document.getElementById('premium');
+if (PAYLOAD.premiumData) {
+  premium.innerHTML = `<span class="badge warn">${PAYLOAD.premiumData.implemented ? 'Datos cargados' : 'No implementado en MVP'}</span><div style="margin-top:8px;color:#8b94a3;font-size:13px">${PAYLOAD.premiumData.note || ''}</div>`;
+} else {
+  premium.innerHTML = '<span style="color:#8b94a3">Modo --premium no activado</span>';
+}
+
+const warnings = document.getElementById('warnings');
+if (PAYLOAD.warnings && PAYLOAD.warnings.length) {
+  warnings.innerHTML = '<ul class="warnings">' + PAYLOAD.warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('') + '</ul>';
+}
+
+document.getElementById('raw').textContent = JSON.stringify(PAYLOAD, null, 2);
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+</script>
+</body>
+</html>
