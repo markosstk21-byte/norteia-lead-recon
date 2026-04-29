@@ -109,9 +109,35 @@ Y opcionalmente:
 - Push a Mission Control (solo con `--push` y OK humano).
 - Ingest al Postgres del Mapeador (solo con `--ingest` y proyecto activo).
 
+## Estado real v0.1.0 vs roadmap
+
+| Característica | v0.1.0 hoy | v0.1.1 (in-flight) | Roadmap |
+|---|---|---|---|
+| `/lead-discover` orquestador | ✅ funcional | + diagnóstico tipado por fuente | — |
+| `/lead-analyze` orquestador | ⚠️ depende de adapters | + confirmación humana en `--premium` | — |
+| `/lead-cross` orquestador | ⚠️ funcional sin guard | + anti-claim guard real (`--assert`) | — |
+| BORME timeline por NIF | ⛔ stub | (sin cambio) | issue #1 / `apps/borme-parser` |
+| DIRCE segment sizing real | ⛔ stub | (sin cambio) | [#2](https://github.com/Luispitik/norteia-lead-recon/issues/2) |
+| Registradores `--premium` real | ⛔ stub (gratis, no cobra) | bloquea con stdin | [#3](https://github.com/Luispitik/norteia-lead-recon/issues/3) |
+| Cobertura provincias OSM | 7/52 | (sin cambio) | issue v0.1.1 |
+| Fallback `apps/borme-parser` | declarado, no invocado | (sin cambio) | issue v0.1.1 |
+| MCP server wrapper | — | — | [#4](https://github.com/Luispitik/norteia-lead-recon/issues/4) |
+| CI GitHub Actions | ❌ | + workflow tests/cov/ruff | — |
+
+> **TL;DR para externos**: la skill ya es útil para discovery (BORME + PLACSP +
+> OSM con fuentes oficiales) y para `/lead-cross` con tu Mission Control.
+> El timeline registral por NIF y el modo Premium son stubs documentados —
+> léelos como roadmap, no como features. Detalles en `CHANGELOG.md` y la
+> sección "Estado de implementación" del `SKILL.md`.
+
 ## Anti-claim guard
 
-Si en la conversación afirmas "esta empresa es ya cliente" / "tengo email del decisor" y `/lead-cross` no encuentra evidencia, la skill emite observation `assertion_mismatch` y warn explícito. **Nunca** escribe a Mission Control sin confirmación humana.
+> **v0.1.0**: documentado, no implementado. Llega en v0.1.1.
+
+Diseño: si afirmas "esta empresa es ya cliente" / "tengo email del decisor" y
+`/lead-cross` no encuentra evidencia, la skill emite `assertion_mismatch` y
+bloquea cualquier escritura a Mission Control sin confirmación humana. La API
+mínima será `cross.py --assert "campo=valor"`.
 
 ## Standalone vs delegate
 

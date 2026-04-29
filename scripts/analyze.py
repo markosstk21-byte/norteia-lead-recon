@@ -28,14 +28,76 @@ import infosubvenciones
 import placsp
 
 
-def analyze(input_str: str, premium: bool = False) -> dict:
-    """Main analyze pipeline."""
+class PremiumDeclined(RuntimeError):
+    """Raised when the operator declines the --premium cost confirmation."""
+
+
+def confirm_premium_cost(estimated_cost_eur: tuple[int, int] = (10, 30),
+                         assume_yes: bool = False,
+                         stream=None) -> bool:
+    """Block until the human confirms the --premium cost, or returns False on decline.
+
+    Why: the b2b-lead-recon blueprint mandates "registradores.org reservado a
+    modo --premium con confirmación humana". Until v0.1.1 this was just a
+    printed WARN — anyone running with --premium would silently bypass the
+    cost gate. Now it BLOCKS on stdin unless `assume_yes=True` (CI / scripts).
+
+    Notes:
+    - Returns False if the user types anything other than 'y' / 'yes' / 'sí'.
+    - With assume_yes=True (or env LEAD_RECON_PREMIUM_YES=1) returns True
+      without prompting — for non-interactive runs.
+    """
+    import os
+    lo, hi = estimated_cost_eur
+    if assume_yes or os.environ.get("LEAD_RECON_PREMIUM_YES") == "1":
+        return True
+    out = stream or sys.stderr
+    print(
+        f"\n[--premium] Coste estimado por consulta: €{lo}-{hi} a Registradores.org.",
+        file=out,
+    )
+    print(
+        "[--premium] La integración con Registradores.org NO está implementada en v0.1.0.",
+        file=out,
+    )
+    print(
+        "[--premium] Aun así, esta confirmación bloquea para que la skill no llame a APIs",
+        file=out,
+    )
+    print(
+        "[--premium] de pago en futuras versiones sin OK humano.",
+        file=out,
+    )
+    try:
+        ans = input("¿Confirmas el cargo? [y/N] ").strip().lower()
+    except EOFError:
+        return False
+    return ans in ("y", "yes", "s", "si", "sí")
+
+
+def analyze(input_str: str, premium: bool = False, premium_confirmed: bool = False) -> dict:
+    """Main analyze pipeline.
+
+    Args:
+        input_str: NIF/CIF or razón social.
+        premium: include Registradores.org slot in the output.
+        premium_confirmed: REQUIRED to be True when premium=True. Acts as the
+            in-process record that the human said yes (CLI + tests pass it
+            explicitly). The function never auto-confirms — that's main()'s job.
+    """
     nif: Optional[str] = None
     razon_social: Optional[str] = None
     if is_valid_nif(input_str):
         nif = normalize_nif(input_str)
     else:
         razon_social = input_str.strip()
+
+    if premium and not premium_confirmed:
+        raise PremiumDeclined(
+            "analyze() called with premium=True but premium_confirmed=False. "
+            "Use confirm_premium_cost() before invoking, or pass --yes / "
+            "LEAD_RECON_PREMIUM_YES=1 from the CLI."
+        )
 
     payload: dict[str, Any] = {
         "schemaVersion": "1.0.0",
@@ -169,14 +231,30 @@ def _render_html_twin(payload: dict) -> Optional[Path]:
 def main() -> None:
     p = argparse.ArgumentParser(description="norteia-lead-recon — analyze orchestrator")
     p.add_argument("--input", required=True, help="NIF/CIF o razón social")
-    p.add_argument("--premium", action="store_true", help="Incluye Registro Mercantil (€10-30, requiere confirmación humana)")
+    p.add_argument(
+        "--premium",
+        action="store_true",
+        help="Incluye Registro Mercantil (€10-30, requiere confirmación humana en stdin)",
+    )
+    p.add_argument(
+        "--yes",
+        action="store_true",
+        help=(
+            "Skip the interactive confirmation for --premium. Use only in CI/scripts "
+            "where you have already approved the cost out-of-band. Equivalent to "
+            "LEAD_RECON_PREMIUM_YES=1."
+        ),
+    )
     args = p.parse_args()
 
+    premium_confirmed = False
     if args.premium:
-        print("WARN: --premium activado. Coste estimado €10-30 por consulta a registradores.org.")
-        print("WARN: La integración con registradores.org NO está implementada en este MVP.")
+        premium_confirmed = confirm_premium_cost(assume_yes=args.yes)
+        if not premium_confirmed:
+            print("[--premium] Confirmación cancelada. No se realizó ninguna llamada de pago.", file=sys.stderr)
+            sys.exit(2)
 
-    payload = analyze(args.input, args.premium)
+    payload = analyze(args.input, args.premium, premium_confirmed=premium_confirmed)
     print(json.dumps({
         "input": payload["input"],
         "registralTimelineCount": len(payload["registralTimeline"]),

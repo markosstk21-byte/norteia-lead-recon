@@ -192,7 +192,43 @@ Ruta canónica: `~/.claude/.cache/lead-recon/<YYYY-MM-DD>/`
 
 ## Anti-claim guard
 
-Si en la conversación el operador afirma "esta empresa es ya cliente" / "tengo email del decisor" / "ya hablé con ellos" y `--cross` no encuentra evidencia → emite observation `assertion_mismatch` y warn explícito en chat. **Nunca** escribe a Mission Control sin OK humano.
+> **Estado v0.1.0**: documentado pero **no implementado en código**. Pendiente
+> en v0.1.1 (P0 audit). El guard descrito abajo es la intención de diseño.
+
+Diseño previsto: si en la conversación el operador afirma "esta empresa es ya
+cliente" / "tengo email del decisor" / "ya hablé con ellos" y `--cross` no
+encuentra evidencia → emite observation `assertion_mismatch` y warn explícito
+en chat. **Nunca** escribe a Mission Control sin OK humano.
+
+API mínima en marcha: `cross.py --assert "campo=valor"` devolverá
+`assertion_mismatch: true` cuando ninguna de las fuentes (Mission Control,
+briefs, observations) respalde la afirmación, y bloqueará cualquier
+`update_operator_state_section`.
+
+## Estado de implementación de los componentes
+
+> Honestidad antes de dependencia: cada componente lleva su estado real en
+> v0.1.0 para que ningún consumidor (Forja, alumno, cliente) tome una decisión
+> basada en una promesa no implementada.
+
+| Componente | Estado | Detalle |
+|---|---|---|
+| `discover.py` orquestador | ✅ funcional | con diagnóstico tipado por fuente desde v0.1.1 |
+| `analyze.py` orquestador | ⚠️ parcial | depende de adapters; `--premium` ahora bloquea con confirmación humana |
+| `cross.py` orquestador | ⚠️ parcial | lee Mission Control + briefs + observations; anti-claim guard pendiente |
+| `borme.py` discovery | ✅ funcional | últimos 30 días, sumarios. Sin parser de XML de acto (issue #1) |
+| `borme.py` analyze por NIF | ⛔ stub | BORME no expone índice por NIF. Requiere `apps/borme-parser` o `--premium` |
+| `cartociudad.py` | ✅ funcional | geocoder IGN, fallback JSONP→JSON |
+| `placsp.py` | ⚠️ parcial | feeds Atom anuales, filtro por keyword textual del CNAE |
+| `infosubvenciones.py` | ⚠️ parcial | scraping HTML frágil, sin API JSON |
+| `aepd.py` | ⚠️ parcial | endpoint web, heurística "string in body" |
+| `osm.py` | ⚠️ parcial | sólo 7/52 provincias en `PROVINCE_BBOX` (issue v0.1.1) |
+| `ddg.py` | ✅ funcional | rate-limit 2s, User-Agent identificable |
+| `dirce.py` | ⛔ stub | `totalCompanies: null` por ahora (issue #2) |
+| `domain_resolver.py` | ✅ funcional | waterfall heurística → DDG → Wayback |
+| `--premium` Registradores | ⛔ stub | no llama a Registradores; sí bloquea con confirmación humana |
+| Anti-claim guard | ⛔ docs-only | implementación en v0.1.1 |
+| Fallback `apps/borme-parser` | ⛔ docs-only | `detect_project_runners()` existe pero no se invoca aún (issue v0.1.1) |
 
 ## Integraciones
 
