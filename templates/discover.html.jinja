@@ -28,8 +28,17 @@
   .badge.ok { background: #1f3a2a; color: #6cd083; }
   .badge.warn { background: #3a2f1f; color: #d0a06c; }
   .badge.err { background: #3a1f1f; color: #d06c6c; }
+  .badge.idle { background: #1d2129; color: #8b94a3; }
   .source-pill { display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 10px; background: #1d2129; color: #8b94a3; margin-right: 4px; }
   .footer { padding: 16px 24px; color: #6c7383; font-size: 11px; border-top: 1px solid #1d2129; }
+  .diagnostic { background: #2a2418; border: 1px solid #4a3a1f; border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; }
+  .diagnostic h2 { margin: 0 0 6px; font-size: 14px; color: #d0a06c; }
+  .diagnostic p { margin: 0; color: #8b94a3; font-size: 12px; line-height: 1.5; }
+  .source-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid #1d2129; }
+  .source-row:last-child { border-bottom: 0; }
+  .source-row .meta { flex: 1; font-size: 12px; color: #8b94a3; }
+  .source-row .meta .name { color: #e8eaed; font-weight: 600; margin-right: 6px; }
+  .source-row .meta .reason { display: block; margin-top: 3px; color: #6c7383; font-size: 11px; }
 </style>
 </head>
 <body>
@@ -40,6 +49,7 @@
 <div class="layout">
   <div id="map"></div>
   <div class="panel">
+    <div id="diagnostic-zero"></div>
     <div class="stats" id="stats"></div>
     <table>
       <thead>
@@ -85,15 +95,56 @@ PAYLOAD.candidates.forEach(c => {
   tbody.appendChild(tr);
 });
 
+// Source diagnostic panel — accept both legacy string shape and v0.1.1+ dict shape.
+function _statusInfo(raw) {
+  if (raw && typeof raw === 'object') {
+    return {
+      status: raw.status || 'unknown',
+      count: typeof raw.count === 'number' ? raw.count : 0,
+      reason: raw.reason || raw.error || '',
+    };
+  }
+  return { status: String(raw || 'unknown'), count: 0, reason: '' };
+}
+function _badgeClass(status) {
+  if (status === 'ok') return 'ok';
+  if (['empty_window', 'not_executed'].includes(status)) return 'idle';
+  if (['network_error', 'http_error', 'parse_error', 'down'].includes(status)) return 'err';
+  return 'warn';
+}
+
 const sourcesEl = document.getElementById('sources');
-Object.entries(PAYLOAD.sourcesAvailability || {}).forEach(([src, status]) => {
-  const cls = status === 'ok' ? 'ok' : status.startsWith('http-') || status === 'down' ? 'err' : 'warn';
-  const el = document.createElement('span');
-  el.className = `badge ${cls}`;
-  el.textContent = `${src}: ${status}`;
-  el.style.marginRight = '6px';
-  sourcesEl.appendChild(el);
+const sourceEntries = Object.entries(PAYLOAD.sourcesAvailability || {});
+sourceEntries.forEach(([src, raw]) => {
+  const info = _statusInfo(raw);
+  const row = document.createElement('div');
+  row.className = 'source-row';
+  const countLabel = info.count ? ` <span style="color:#6c7383;">· ${info.count} ítems</span>` : '';
+  const reasonLabel = info.reason ? `<span class="reason">${escapeHtml(info.reason)}</span>` : '';
+  row.innerHTML = `
+    <span class="badge ${_badgeClass(info.status)}">${escapeHtml(info.status)}</span>
+    <div class="meta"><span class="name">${escapeHtml(src)}</span>${countLabel}${reasonLabel}</div>
+  `;
+  sourcesEl.appendChild(row);
 });
+
+// 0-results diagnostic panel — explain WHY the discovery was empty.
+if (PAYLOAD.totalCandidates === 0) {
+  const panel = document.getElementById('diagnostic-zero');
+  const issueLines = sourceEntries.map(([src, raw]) => {
+    const info = _statusInfo(raw);
+    return `<li><strong>${escapeHtml(src)}</strong> · ${escapeHtml(info.status)}${info.reason ? ` — ${escapeHtml(info.reason)}` : ''}</li>`;
+  }).join('');
+  panel.className = 'diagnostic';
+  panel.innerHTML = `
+    <h2>0 candidatos — esto NO significa "skill rota"</h2>
+    <p>Cada fuente reporta su estado real abajo. Causas frecuentes: ventana de búsqueda
+    vacía (BORME últimos 30 días), precondición ausente (OSM sin tag o sin bbox),
+    o la fuente respondió sin matches. Si ves <code>network_error</code> o <code>down</code>,
+    reintenta en unos minutos.</p>
+    <ul style="margin:10px 0 0 0;padding-left:20px;color:#8b94a3;font-size:12px;">${issueLines}</ul>
+  `;
+}
 
 // Map
 const center = (() => {

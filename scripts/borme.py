@@ -203,7 +203,10 @@ def analyze_by_nif(nif: str) -> dict:
     if not is_valid_nif(nif):
         return {"nif": nif, "error": "invalid-nif-format", "timeline": []}
 
-    SourceStatus.mark("BORME", "ok-no-index")
+    SourceStatus.mark(
+        "BORME", "not_executed",
+        reason="BORME no expone índice por NIF — requiere apps/borme-parser o broker premium (Registradores.org)",
+    )
     emit_observation("tool_lead_recon", {"phase": "borme.analyze", "nif": nif})
     return {
         "nif": nif,

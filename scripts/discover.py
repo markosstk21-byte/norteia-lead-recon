@@ -58,23 +58,51 @@ def discover(geo: str, sector: str, max_results: int = 50) -> dict:
     }
 
     # --- Phase 1: parallel discovery ---
+    # Reset status registry per run so we don't leak state across calls.
+    SourceStatus.reset()
+
+    # OSM precondition check — if missing, mark explicitly instead of silently skipping.
+    cnae_mapping = load_cnae_mapping()
+    tag = cnae_mapping.get("verticalToOverpassTag", {}).get(label)
+    bbox = _provincial_bbox_for(province)
+    osm_executed = bool(tag and bbox)
+    if not osm_executed:
+        if not tag:
+            SourceStatus.mark(
+                "OSM", "not_executed",
+                reason=f"sin tag Overpass mapeado para sector '{label or sector}' (mappings/cnae.json verticalToOverpassTag)",
+            )
+        else:
+            SourceStatus.mark(
+                "OSM", "not_executed",
+                reason=f"sin bbox provincial mapeada para '{province}' (osm.PROVINCE_BBOX)",
+            )
+
     raw_candidates: list[dict] = []
     with ThreadPoolExecutor(max_workers=4) as pool:
         futures = {
             pool.submit(borme.discover_by_cnae_province, cnae_codes, province, 1): "BORME",
             pool.submit(placsp.discover, cnae_codes, province, 1): "PLACSP",
         }
-        # OSM if we have a known bbox + tag
-        cnae_mapping = load_cnae_mapping()
-        tag = cnae_mapping.get("verticalToOverpassTag", {}).get(label)
-        if tag and _provincial_bbox_for(province):
+        if osm_executed:
             futures[pool.submit(osm.discover, tag, province, None)] = "OSM"
 
         for fut in as_completed(futures):
             src = futures[fut]
             try:
                 items = fut.result() or []
+                # Only classify if the adapter didn't already set a more specific failure status.
+                existing_status = SourceStatus.snapshot().get(src, {}).get("status")
+                if existing_status not in ("network_error", "http_error", "parse_error", "down"):
+                    if not items:
+                        SourceStatus.mark(
+                            src, "empty_window",
+                            reason="0 resultados en la ventana de búsqueda (la fuente respondió correctamente)",
+                        )
+                    else:
+                        SourceStatus.mark(src, "ok", count=len(items))
             except Exception as e:  # noqa: BLE001
+                SourceStatus.mark(src, "down", error=str(e))
                 emit_observation("source_unavailable", {"source": src, "error": str(e)})
                 items = []
             for it in items:

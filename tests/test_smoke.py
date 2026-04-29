@@ -136,5 +136,115 @@ class TestDomainResolverHeuristic(unittest.TestCase):
         self.assertTrue(any(".com" in url for url in c))
 
 
+class TestSourceStatus(unittest.TestCase):
+    """v0.1.1: typed source status — every 0-result must be explainable."""
+
+    def setUp(self):
+        _common.SourceStatus.reset()
+
+    def test_typed_status_with_count_reason_and_error(self):
+        ss = _common.SourceStatus
+        ss.mark("BORME", "ok", count=3)
+        ss.mark("PLACSP", "empty_window", reason="0 contratos en ventana")
+        ss.mark("OSM", "not_executed", reason="falta tag")
+        ss.mark("AEPD", "network_error", error="DNS failure")
+        snap = ss.snapshot()
+
+        self.assertEqual(snap["BORME"]["status"], "ok")
+        self.assertEqual(snap["BORME"]["count"], 3)
+        self.assertEqual(snap["PLACSP"]["status"], "empty_window")
+        self.assertIn("0 contratos", snap["PLACSP"]["reason"])
+        self.assertEqual(snap["OSM"]["status"], "not_executed")
+        self.assertIn("falta tag", snap["OSM"]["reason"])
+        self.assertEqual(snap["AEPD"]["status"], "network_error")
+        self.assertEqual(snap["AEPD"]["error"], "DNS failure")
+
+    def test_invalid_status_raises(self):
+        with self.assertRaises(ValueError):
+            _common.SourceStatus.mark("X", "totally-bogus")
+
+    def test_reset_clears_state(self):
+        _common.SourceStatus.mark("X", "ok")
+        _common.SourceStatus.reset()
+        self.assertEqual(_common.SourceStatus.snapshot(), {})
+
+    def test_snapshot_returns_deep_copy(self):
+        _common.SourceStatus.mark("X", "ok", count=1)
+        snap = _common.SourceStatus.snapshot()
+        snap["X"]["count"] = 999
+        self.assertEqual(_common.SourceStatus.snapshot()["X"]["count"], 1)
+
+
+class TestDiscoverDiagnostic(unittest.TestCase):
+    """v0.1.1: discover() must explain WHY a 0-result happened."""
+
+    def setUp(self):
+        # We import lazily so the patches don't leak across the file
+        import borme as _borme
+        import placsp as _placsp
+        import osm as _osm
+        import dirce as _dirce
+        import cartociudad as _cartociudad
+        import domain_resolver as _domain_resolver
+        self._borme = _borme
+        self._placsp = _placsp
+        self._osm = _osm
+        self._orig_borme = _borme.discover_by_cnae_province
+        self._orig_placsp = _placsp.discover
+        self._orig_osm = _osm.discover
+        self._orig_dirce = _dirce.segment_size
+        self._orig_cart = _cartociudad.geocode
+        self._orig_dr = _domain_resolver.resolve
+        # Patch network: empty for all
+        _borme.discover_by_cnae_province = lambda *a, **kw: []
+        _placsp.discover = lambda *a, **kw: []
+        _osm.discover = lambda *a, **kw: []
+        _dirce.segment_size = lambda *a, **kw: {"source": "DIRCE", "totalCompanies": None, "note": "stub"}
+        _cartociudad.geocode = lambda *a, **kw: None
+        _domain_resolver.resolve = lambda *a, **kw: {"resolved": None, "via": "heuristic", "confidence": "low", "candidates": []}
+        _common.SourceStatus.reset()
+
+    def tearDown(self):
+        import borme as _borme
+        import placsp as _placsp
+        import osm as _osm
+        import dirce as _dirce
+        import cartociudad as _cartociudad
+        import domain_resolver as _domain_resolver
+        _borme.discover_by_cnae_province = self._orig_borme
+        _placsp.discover = self._orig_placsp
+        _osm.discover = self._orig_osm
+        _dirce.segment_size = self._orig_dirce
+        _cartociudad.geocode = self._orig_cart
+        _domain_resolver.resolve = self._orig_dr
+
+    def test_zero_results_records_typed_status_per_source(self):
+        import discover
+
+        # Use a fake sector with no Overpass tag mapping to force OSM not_executed.
+        payload = discover.discover("Sevilla", "test-fake-sector-zzzz", max_results=5)
+        self.assertEqual(payload["totalCandidates"], 0)
+        sa = payload["sourcesAvailability"]
+        # BORME and PLACSP responded fine but empty — empty_window
+        self.assertEqual(sa["BORME"]["status"], "empty_window")
+        self.assertIn("count", sa["BORME"])
+        self.assertEqual(sa["PLACSP"]["status"], "empty_window")
+        # OSM not executed because no Overpass tag for our fake sector
+        self.assertEqual(sa["OSM"]["status"], "not_executed")
+        self.assertTrue(sa["OSM"]["reason"], "OSM not_executed must include a human-readable reason")
+
+    def test_exception_in_source_records_down(self):
+        import discover
+
+        def _boom(*a, **kw):
+            raise RuntimeError("boom from BORME")
+        self._borme.discover_by_cnae_province = _boom
+
+        payload = discover.discover("Sevilla", "asesoría fiscal", max_results=5)
+        sa = payload["sourcesAvailability"]
+        self.assertEqual(sa["BORME"]["status"], "down")
+        self.assertIn("boom from BORME", sa["BORME"]["error"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

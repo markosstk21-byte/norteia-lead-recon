@@ -361,19 +361,64 @@ def write_html_twin(mode: str, html: str) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Source availability registry (set by sources at runtime)
+# Source availability registry (set by sources + orchestrators at runtime)
 
 class SourceStatus:
-    """Singleton-ish status tracker. Sources push their up/down status here."""
-    _status: dict[str, str] = {}
+    """Per-source status tracker with typed reasons.
+
+    A source NEVER fails silently. The orchestrator must be able to read this
+    snapshot and tell the operator *why* a source contributed 0 results — caved
+    network, hit zero in the search window, or wasn't executed at all because
+    a precondition was missing. Conflating those three is the bug that produced
+    leadReconStats.lastTotal:0 in v0.1.0 with no visible cause.
+
+    Status vocabulary (the only allowed values):
+      - "ok"            : responded with results
+      - "empty_window"  : responded fine but the query window was empty
+      - "network_error" : URLError, DNS failure, timeout
+      - "http_error"    : HTTP status != 2xx
+      - "parse_error"   : response received, couldn't be parsed
+      - "not_executed"  : precondition missing (e.g. no Overpass tag, no bbox)
+      - "down"          : adapter-internal failure that doesn't fit above
+    """
+
+    _ALLOWED = (
+        "ok", "empty_window", "network_error", "http_error",
+        "parse_error", "not_executed", "down",
+    )
+
+    _entries: dict[str, dict] = {}
 
     @classmethod
-    def mark(cls, source: str, status: str) -> None:
-        cls._status[source] = status
+    def mark(
+        cls,
+        source: str,
+        status: str,
+        count: int = 0,
+        reason: str = "",
+        error: str = "",
+    ) -> None:
+        if status not in cls._ALLOWED:
+            # Be strict — typos in status names defeat the whole point
+            raise ValueError(
+                f"SourceStatus.mark: invalid status {status!r} for {source!r}. "
+                f"Allowed: {cls._ALLOWED}"
+            )
+        cls._entries[source] = {
+            "status": status,
+            "count": int(count),
+            "reason": reason,
+            "error": error,
+        }
 
     @classmethod
-    def snapshot(cls) -> dict[str, str]:
-        return dict(cls._status)
+    def reset(cls) -> None:
+        cls._entries = {}
+
+    @classmethod
+    def snapshot(cls) -> dict[str, dict]:
+        """Deep copy of the current per-source status map."""
+        return {k: dict(v) for k, v in cls._entries.items()}
 
 
 if __name__ == "__main__":
