@@ -20,7 +20,6 @@ import re
 import sys
 import urllib.parse
 from pathlib import Path
-from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import CacheConfig, SourceStatus, cache_get, cache_set, emit_observation, http_get, normalize_nif

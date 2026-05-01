@@ -21,7 +21,6 @@ import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import CacheConfig, SourceStatus, cache_get, cache_set, emit_observation, http_get, normalize_nif
@@ -36,7 +35,7 @@ PLACSP_FEED_TEMPLATE = (
 )
 
 
-def fetch_feed(year: int) -> Optional[str]:
+def fetch_feed(year: int) -> str | None:
     cache_key = f"feed:{year}"
     cached = cache_get(CACHE, cache_key)
     if cached is not None:
@@ -77,7 +76,7 @@ def parse_feed_entries(xml_text: str) -> list[dict]:
     return out
 
 
-def discover(cnae: list[str], province: Optional[str], years: int = 1) -> list[dict]:
+def discover(cnae: list[str], province: str | None, years: int = 1) -> list[dict]:
     """
     Returns adjudicatarios filtered by best-effort CNAE/province match in entry text.
     Note: PLACSP feeds don't expose CNAE as a structured field — filtering is textual.

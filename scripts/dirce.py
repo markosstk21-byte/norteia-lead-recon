@@ -17,16 +17,15 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import CacheConfig, SourceStatus, cache_get, cache_set, http_get
+from _common import CacheConfig, SourceStatus, cache_get, cache_set
 
 CACHE = CacheConfig(namespace="dirce", ttl_seconds=60 * 60 * 24 * 30)
 INE_TABLE_URL = "https://servicios.ine.es/wstempus/jsCache/ES/DATOS_TABLA/{tabla}?nult=1"
 
 
-def segment_size(cnae: str, province: Optional[str] = None) -> dict:
+def segment_size(cnae: str, province: str | None = None) -> dict:
     """
     Returns the approximate number of companies in DIRCE for the given CNAE
     (and optionally province). Heuristic: queries a known INE table and

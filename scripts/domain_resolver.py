@@ -22,10 +22,8 @@ import argparse
 import json
 import re
 import sys
-import unicodedata
 import urllib.parse
 from pathlib import Path
-from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import CacheConfig, cache_get, cache_set, emit_observation, http_get, normalize_razon_social
@@ -60,7 +58,7 @@ def heuristic_candidates(razon_social: str) -> list[str]:
     ]
 
 
-def resolve(razon_social: str, city: Optional[str] = None) -> dict:
+def resolve(razon_social: str, city: str | None = None) -> dict:
     cache_key = f"{razon_social}|{city or ''}"
     cached = cache_get(CACHE, cache_key)
     if cached is not None:

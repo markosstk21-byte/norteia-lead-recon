@@ -4,7 +4,6 @@ unit tests deterministas. Para tests con red, usar `pytest -m network`.
 """
 from __future__ import annotations
 
-import json
 import sys
 import unittest
 from pathlib import Path
@@ -12,10 +11,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
-import _common
-import borme
-import dirce
-import domain_resolver
+# Imports below MUST stay after the sys.path.insert above so the test runner can
+# resolve the skill's adapters from `scripts/`. E402 is noisy here, hence noqa.
+import _common  # noqa: E402
+import borme  # noqa: E402
+import dirce  # noqa: E402
+import domain_resolver  # noqa: E402
 
 
 class TestNormalization(unittest.TestCase):
@@ -261,8 +262,9 @@ class TestPremiumConfirmation(unittest.TestCase):
         self.assertTrue(analyze.confirm_premium_cost(assume_yes=True))
 
     def test_confirm_returns_true_with_env_override(self):
-        import analyze
         import os
+
+        import analyze
         prev = os.environ.get("LEAD_RECON_PREMIUM_YES")
         os.environ["LEAD_RECON_PREMIUM_YES"] = "1"
         try:
@@ -300,11 +302,11 @@ class TestDiscoverDiagnostic(unittest.TestCase):
     def setUp(self):
         # We import lazily so the patches don't leak across the file
         import borme as _borme
-        import placsp as _placsp
-        import osm as _osm
-        import dirce as _dirce
         import cartociudad as _cartociudad
+        import dirce as _dirce
         import domain_resolver as _domain_resolver
+        import osm as _osm
+        import placsp as _placsp
         self._borme = _borme
         self._placsp = _placsp
         self._osm = _osm
@@ -325,11 +327,11 @@ class TestDiscoverDiagnostic(unittest.TestCase):
 
     def tearDown(self):
         import borme as _borme
-        import placsp as _placsp
-        import osm as _osm
-        import dirce as _dirce
         import cartociudad as _cartociudad
+        import dirce as _dirce
         import domain_resolver as _domain_resolver
+        import osm as _osm
+        import placsp as _placsp
         _borme.discover_by_cnae_province = self._orig_borme
         _placsp.discover = self._orig_placsp
         _osm.discover = self._orig_osm

@@ -14,19 +14,25 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import (
-    SourceStatus, emit_observation, levenshtein, load_cnae_mapping, normalize_razon_social,
-    now_iso, province_code, resolve_sector, today_dir, update_operator_state_section,
-    write_html_twin, write_snapshot,
-)
-
 import borme
+import cartociudad
 import dirce
 import domain_resolver
-import infosubvenciones
 import osm
 import placsp
-import cartociudad
+from _common import (
+    SourceStatus,
+    emit_observation,
+    levenshtein,
+    load_cnae_mapping,
+    normalize_razon_social,
+    now_iso,
+    province_code,
+    resolve_sector,
+    update_operator_state_section,
+    write_html_twin,
+    write_snapshot,
+)
 
 
 def _provincial_bbox_for(province: str) -> tuple[float, float, float, float] | None:

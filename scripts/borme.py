@@ -23,14 +23,19 @@ import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import (
-    CacheConfig, SourceStatus, cache_get, cache_set, emit_observation,
-    http_get, is_valid_nif, normalize_nif, normalize_razon_social,
+    CacheConfig,
+    SourceStatus,
+    cache_get,
+    cache_set,
+    emit_observation,
+    http_get,
+    is_valid_nif,
+    normalize_nif,
+    normalize_razon_social,
 )
-
 
 # Public BOE/BORME endpoints. Verified URLs as of 2026-04 — operator should
 # re-verify if a request returns 404.
@@ -52,7 +57,7 @@ def _date_range(years: int) -> list[str]:
     return list(dict.fromkeys(out))
 
 
-def fetch_sumario_xml(date_yyyymmdd: str) -> Optional[str]:
+def fetch_sumario_xml(date_yyyymmdd: str) -> str | None:
     """Fetches the BORME sumario for a given date. Cached forever per date."""
     cache_key = f"sumario:{date_yyyymmdd}"
     cached = cache_get(CACHE_BORME, cache_key)
@@ -90,7 +95,7 @@ def parse_sumario(xml_text: str) -> list[dict]:
     return out
 
 
-def fetch_act_xml(url_xml: str) -> Optional[str]:
+def fetch_act_xml(url_xml: str) -> str | None:
     """Fetches an individual BORME act XML. Cached forever per ID."""
     if not url_xml:
         return None
@@ -107,7 +112,7 @@ def fetch_act_xml(url_xml: str) -> Optional[str]:
     return body
 
 
-def discover_by_cnae_province(cnae_codes: list[str], province: Optional[str], years: int = 1) -> list[dict]:
+def discover_by_cnae_province(cnae_codes: list[str], province: str | None, years: int = 1) -> list[dict]:
     """
     Discovery mode. Returns a list of company candidates extracted from BORME.
 

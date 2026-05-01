@@ -15,7 +15,6 @@ import json
 import sys
 import urllib.parse
 from pathlib import Path
-from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import CacheConfig, SourceStatus, cache_get, cache_set, emit_observation, http_get
@@ -95,7 +94,7 @@ def query_overpass(tag: str, bbox: tuple[float, float, float, float], timeout: i
     return results
 
 
-def _build_address(tags: dict) -> Optional[str]:
+def _build_address(tags: dict) -> str | None:
     parts = []
     if tags.get("addr:street"):
         s = tags["addr:street"]
@@ -109,7 +108,7 @@ def _build_address(tags: dict) -> Optional[str]:
     return ", ".join(parts) if parts else None
 
 
-def discover(tag: str, province: Optional[str] = None, bbox: Optional[str] = None) -> list[dict]:
+def discover(tag: str, province: str | None = None, bbox: str | None = None) -> list[dict]:
     if bbox:
         s, w, n, e = [float(x) for x in bbox.split(",")]
         bb = (s, w, n, e)

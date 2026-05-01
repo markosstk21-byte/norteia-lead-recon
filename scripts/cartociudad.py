@@ -14,7 +14,6 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import CacheConfig, SourceStatus, cache_get, cache_set, http_get, normalize_razon_social
@@ -25,7 +24,7 @@ CARTOCIUDAD_FIND_PLAIN = "https://www.cartociudad.es/geocoder/api/geocoder/find?
 CACHE = CacheConfig(namespace="cartociudad", ttl_seconds=60 * 60 * 24 * 90)
 
 
-def geocode(address: str) -> Optional[dict]:
+def geocode(address: str) -> dict | None:
     """Returns {"lat": float, "lon": float, "formatted": str, "type": "address|portal|..."} or None."""
     if not address:
         return None
@@ -38,7 +37,7 @@ def geocode(address: str) -> Optional[dict]:
     q = urllib.parse.quote(address)
     # Try plain JSON first; fall back to JSONP if needed
     status, body = http_get(CARTOCIUDAD_FIND_PLAIN.format(q=q), timeout=15)
-    payload: Optional[dict] = None
+    payload: dict | None = None
     if status == 200 and body.strip().startswith("{"):
         try:
             payload = json.loads(body)

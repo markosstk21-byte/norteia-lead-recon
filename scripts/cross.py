@@ -14,18 +14,21 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import sys
 from pathlib import Path
-from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import (
-    HOME, OBSERVATIONS_PATH, OPERATOR_STATE_PATH, emit_observation, http_get,
-    is_valid_nif, normalize_nif, normalize_razon_social, now_iso, today_dir,
+    HOME,
+    OBSERVATIONS_PATH,
+    emit_observation,
+    http_get,
+    is_valid_nif,
+    normalize_nif,
+    normalize_razon_social,
+    now_iso,
     write_snapshot,
 )
-
 
 CACHE_LRB = HOME / ".claude" / ".cache" / "lead-research-brief"
 CACHE_MPB = HOME / ".claude" / ".cache" / "meeting-preaudit-brief"

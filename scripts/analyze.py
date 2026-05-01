@@ -12,20 +12,23 @@ import json
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import (
-    SourceStatus, emit_observation, is_valid_nif, normalize_nif,
-    now_iso, today_dir, write_html_twin, write_snapshot,
-)
-
 import aepd
 import borme
-import cartociudad
 import domain_resolver
 import infosubvenciones
 import placsp
+from _common import (
+    SourceStatus,
+    emit_observation,
+    is_valid_nif,
+    normalize_nif,
+    now_iso,
+    write_html_twin,
+    write_snapshot,
+)
 
 
 class PremiumDeclined(RuntimeError):
@@ -85,8 +88,8 @@ def analyze(input_str: str, premium: bool = False, premium_confirmed: bool = Fal
             in-process record that the human said yes (CLI + tests pass it
             explicitly). The function never auto-confirms — that's main()'s job.
     """
-    nif: Optional[str] = None
-    razon_social: Optional[str] = None
+    nif: str | None = None
+    razon_social: str | None = None
     if is_valid_nif(input_str):
         nif = normalize_nif(input_str)
     else:
@@ -217,7 +220,7 @@ def analyze(input_str: str, premium: bool = False, premium_confirmed: bool = Fal
     return payload
 
 
-def _render_html_twin(payload: dict) -> Optional[Path]:
+def _render_html_twin(payload: dict) -> Path | None:
     template_path = Path(__file__).resolve().parent.parent / "templates" / "analyze.html.jinja"
     if not template_path.exists():
         return None

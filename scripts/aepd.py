@@ -14,10 +14,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 from pathlib import Path
-from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import CacheConfig, SourceStatus, cache_get, cache_set, emit_observation, http_get, normalize_nif
@@ -27,7 +25,7 @@ AEPD_SEARCH = "https://www.aepd.es/dpd/buscar.html?nif={nif}"
 AEPD_SEARCH_NAME = "https://www.aepd.es/dpd/buscar.html?razon_social={name}"
 
 
-def lookup_dpo(nif: Optional[str] = None, razon_social: Optional[str] = None) -> dict:
+def lookup_dpo(nif: str | None = None, razon_social: str | None = None) -> dict:
     """
     Returns:
         {

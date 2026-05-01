@@ -12,11 +12,10 @@ import re
 import sys
 import time
 import unicodedata
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
-
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -31,17 +30,17 @@ PROJECTS_REGISTRY_PATH = HOME / ".claude" / "skills" / "_projects.json"
 
 def today_dir() -> Path:
     """Returns the cache dir for today, creating it if needed."""
-    d = CACHE_ROOT / datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d = CACHE_ROOT / datetime.now(UTC).strftime("%Y-%m-%d")
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 
 def now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def now_compact() -> str:
-    return datetime.now(timezone.utc).strftime("%H%M%S")
+    return datetime.now(UTC).strftime("%H%M%S")
 
 
 # ---------------------------------------------------------------------------
@@ -50,7 +49,7 @@ def now_compact() -> str:
 @dataclass
 class CacheConfig:
     namespace: str
-    ttl_seconds: Optional[int] = 60 * 60 * 24  # 24h default; None = forever
+    ttl_seconds: int | None = 60 * 60 * 24  # 24h default; None = forever
 
 
 def _cache_key(namespace: str, key: str) -> Path:
@@ -61,7 +60,7 @@ def _cache_key(namespace: str, key: str) -> Path:
     return d / f"{safe}.json"
 
 
-def cache_get(cfg: CacheConfig, key: str) -> Optional[Any]:
+def cache_get(cfg: CacheConfig, key: str) -> Any | None:
     p = _cache_key(cfg.namespace, key)
     if not p.exists():
         return None
@@ -306,7 +305,7 @@ def resolve_sector(input_str: str) -> dict:
     return {"input": input_str, "cnae": [], "matched_via": "none", "label": None}
 
 
-def province_code(name: str) -> Optional[str]:
+def province_code(name: str) -> str | None:
     """Normalizes Spanish province name to INE 2-digit code. Returns None if not found."""
     mapping = load_cnae_mapping().get("_provinceCodes", {})
     norm = normalize_razon_social(name or "")
@@ -321,13 +320,13 @@ def province_code(name: str) -> Optional[str]:
 # ---------------------------------------------------------------------------
 # HTTP helper (no external deps, urllib only)
 
-def http_get(url: str, headers: Optional[dict] = None, timeout: int = 15) -> tuple[int, str]:
+def http_get(url: str, headers: dict | None = None, timeout: int = 15) -> tuple[int, str]:
     """
     Returns (status_code, body_text). Never raises on HTTP errors —
     callers decide what to do with the status code.
     """
-    import urllib.request
     import urllib.error
+    import urllib.request
     req = urllib.request.Request(url, headers=headers or {"User-Agent": "norteia-lead-recon/0.1"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
