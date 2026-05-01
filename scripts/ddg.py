@@ -56,7 +56,7 @@ def search(query: str, max_results: int = 10) -> list[dict]:
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) norteia-lead-recon/0.1",
     })
     if status != 200 or "result__a" not in body:
-        SourceStatus.mark("DDG", f"http-{status}")
+        SourceStatus.mark("DDG", "http_error", error=f"HTTP {status}")
         emit_observation("source_unavailable", {"source": "DDG", "status": status})
         return []
 

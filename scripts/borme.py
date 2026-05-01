@@ -106,7 +106,7 @@ def fetch_act_xml(url_xml: str) -> str | None:
         return cached
     status, body = http_get(full, timeout=20)
     if status != 200:
-        SourceStatus.mark("BORME-act", f"http-{status}")
+        SourceStatus.mark("BORME-act", "http_error", error=f"HTTP {status}")
         return None
     cache_set(CACHE_BORME, cache_key, body)
     return body

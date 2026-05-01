@@ -43,7 +43,7 @@ def fetch_feed(year: int) -> str | None:
     url = PLACSP_FEED_TEMPLATE.format(year=year)
     status, body = http_get(url, timeout=30)
     if status != 200 or "<feed" not in body[:500]:
-        SourceStatus.mark("PLACSP", f"http-{status}")
+        SourceStatus.mark("PLACSP", "http_error", error=f"HTTP {status}")
         emit_observation("source_unavailable", {"source": "PLACSP", "year": year, "status": status})
         return None
     cache_set(CACHE, cache_key, body)

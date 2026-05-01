@@ -39,7 +39,13 @@ def segment_size(cnae: str, province: str | None = None) -> dict:
     # The exact table id changes between INE refreshes. As a placeholder this
     # implementation marks the segment as "available" or "down" and returns
     # a flag for the orchestrator to handle.
-    SourceStatus.mark("DIRCE", "stub")
+    SourceStatus.mark(
+        "DIRCE", "not_executed",
+        reason=(
+            "DIRCE Tempus3 mapping pendiente (issue #2). Devuelve segment_size "
+            "con totalCompanies=None hasta que se resuelva el mapeo INE."
+        ),
+    )
     result = {
         "totalCompanies": None,
         "source": "DIRCE",

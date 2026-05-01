@@ -59,7 +59,7 @@ def lookup_dpo(nif: str | None = None, razon_social: str | None = None) -> dict:
 
     status, body = http_get(url, timeout=15)
     if status not in (200, 302):
-        SourceStatus.mark("AEPD", f"http-{status}")
+        SourceStatus.mark("AEPD", "http_error", error=f"HTTP {status}")
         emit_observation("source_unavailable", {"source": "AEPD", "status": status})
         result = {"registered": False, "source": None, "method": method, "error": f"http-{status}"}
         cache_set(CACHE, cache_key, result)

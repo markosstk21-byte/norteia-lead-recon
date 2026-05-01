@@ -44,7 +44,7 @@ def by_nif(nif: str) -> list[dict]:
     url = SNPSAP_SEARCH_NIF.format(nif=urllib.parse.quote(nif))
     status, body = http_get(url, timeout=20)
     if status != 200:
-        SourceStatus.mark("Infosubvenciones", f"http-{status}")
+        SourceStatus.mark("Infosubvenciones", "http_error", error=f"HTTP {status}")
         emit_observation("source_unavailable", {"source": "Infosubvenciones", "status": status})
         return []
 

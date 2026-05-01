@@ -54,7 +54,7 @@ def geocode(address: str) -> dict | None:
                 except json.JSONDecodeError:
                     payload = None
     if payload is None:
-        SourceStatus.mark("Cartociudad", f"http-{status}")
+        SourceStatus.mark("Cartociudad", "http_error", error=f"HTTP {status}")
         return None
 
     # Cartociudad response shape (v2): list under root or {"results": [...]}.

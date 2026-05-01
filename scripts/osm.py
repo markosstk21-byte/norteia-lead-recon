@@ -57,14 +57,14 @@ def query_overpass(tag: str, bbox: tuple[float, float, float, float], timeout: i
     url = OVERPASS_URL.format(query=urllib.parse.quote(ql))
     status, body = http_get(url, timeout=timeout + 5)
     if status != 200:
-        SourceStatus.mark("OSM", f"http-{status}")
+        SourceStatus.mark("OSM", "http_error", error=f"HTTP {status}")
         emit_observation("source_unavailable", {"source": "OSM-Overpass", "status": status})
         return []
 
     try:
         payload = json.loads(body)
-    except json.JSONDecodeError:
-        SourceStatus.mark("OSM", "parse-error")
+    except json.JSONDecodeError as e:
+        SourceStatus.mark("OSM", "parse_error", error=str(e))
         return []
 
     SourceStatus.mark("OSM", "ok")
